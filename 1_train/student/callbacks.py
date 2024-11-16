@@ -21,6 +21,16 @@ def get_early_stopping_callback() -> Optional[tf.keras.callbacks.Callback]:
     callback = None
 
     ### ENTER STUDENT CODE BELOW ###
+    callback = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        min_delta=1e-6, # TODO check value considered negligible
+        patience=10,
+        verbose=1,
+        mode='auto',
+        baseline=None,
+        restore_best_weights=True,
+        start_from_epoch=0
+    )
 
     ### ENTER STUDENT CODE ABOVE ###
 

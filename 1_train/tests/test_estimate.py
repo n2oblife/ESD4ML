@@ -88,7 +88,6 @@ def test_estimate_rom():
     # Multi layer
     assert estimate_rom(ALL_TENSORS) == 45840
 
-
 def test_estimate_ram():
     # Trvial cases
     assert (

@@ -4,11 +4,6 @@ import numpy as np
 import collections
 from typing import List
 
-### ENTER STUDENT CODE BELOW ###
-# If required, add further imports here
-
-### ENTER STUDENT CODE ABOVE ###
-
 # Define custom types for tensors and layers
 MyTensor = collections.namedtuple("MyTensor", ("idx", "name", "shape", "dtype", "is_const"))
 MyLayer = collections.namedtuple("MyLayer", ("idx", "name", "inputs", "outputs"))
@@ -23,6 +18,50 @@ Example Usage for FC layer (e.g. y=W'x+b):
 >>> fc = MyLayer(0, "FullyConnected", [input.idx, weights.idx, bias.idx], [output.idx])
 """
 
+### ENTER STUDENT CODE BELOW ###
+# If required, add further imports here
+import math
+import tensorflow as tf
+
+dtype_size = {
+    "float32": 4,
+    "float16": 2,
+    "float8":1,
+    "int64": 8,
+    "int32": 4,
+    "int16": 2,
+    "int8": 1,
+    "uint64": 8,
+    "uint32": 4,
+    "uint16": 2,
+    "uint8": 1,
+}
+
+def tensor_size(tensor: MyTensor) -> int:
+    """Determine the size of a tensor in bytes.
+
+    Arguments
+    ---------
+    tensor : tf.Tensor
+        The tensor to determine the size for.
+
+    Returns
+    -------
+    d_size : int
+        The size of the tensor in bytes.
+    """
+    num_elements = math.prod(tensor.shape)  # Total number of elements in the tensor
+
+    # Data type sizes in bytes
+    d_size = 0
+
+    # Calculate the size of the tensor in bytes : num_elements * dtype_size
+    d_size = num_elements * dtype_size.get(tensor.dtype, 0) 
+
+    return d_size
+
+
+### ENTER STUDENT CODE ABOVE ###
 
 def estimate_conv2d_macs(in_shape: List[int], kernel_shape: List[int], out_shape: List[int]):
     """Calculate the estimated number of MACS to execute a Conv2D layer.
@@ -60,7 +99,7 @@ def estimate_conv2d_macs(in_shape: List[int], kernel_shape: List[int], out_shape
     macs = 0
 
     ### ENTER STUDENT CODE BELOW ###
-
+    macs = output_h * output_w * output_c * kernel_h * kernel_w * input_c
     ### ENTER STUDENT CODE ABOVE ###
 
     return macs
@@ -106,7 +145,7 @@ def estimate_depthwise_conv2d_macs(
     macs = 0
 
     ### ENTER STUDENT CODE BELOW ###
-
+    macs = output_h * output_w * input_c * kernel_h * kernel_w * channel_mult
     ### ENTER STUDENT CODE ABOVE ###
 
     return macs
@@ -150,7 +189,7 @@ def estimate_fully_connected_macs(
     macs = 0
 
     ### ENTER STUDENT CODE BELOW ###
-
+    macs = input_h * input_w * output_w
     ### ENTER STUDENT CODE ABOVE ###
 
     return macs
@@ -180,6 +219,10 @@ def estimate_rom(tensors: List[MyTensor]):
     rom_bytes = 0
 
     ### ENTER STUDENT CODE BELOW ###
+    
+    for tensor in tensors:
+        if tensor.is_const: # Only consider constant tensors because they are the only ones stored in ROM            
+            rom_bytes += tensor_size(tensor)
 
     ### ENTER STUDENT CODE ABOVE ###
 
@@ -214,7 +257,63 @@ def estimate_ram(tensors: List[MyTensor], layers: List[MyLayer]):
     ram_bytes = 0
 
     ### ENTER STUDENT CODE BELOW ###
+    #TODO implement greedy by size algorithm
+    for tensor in tensors[1:]:
+        if not tensor.is_const:
+            ram_bytes = max(tensor_size(tensor), ram_bytes)
+    ram_bytes = tensor_size(tensors[0]) + ram_bytes if not tensors[0].is_const else ram_bytes
 
     ### ENTER STUDENT CODE ABOVE ###
 
+    return ram_bytes
+
+def estimate_ram_(tensors: List[MyTensor], layers: List[MyLayer]):
+    """Calculate the estimated number of bytes required to store model tensors in RAM."""
+    ram_bytes = 0
+    memory_pool = {}  # Dictionary to simulate buffer allocation
+    peak_ram = 0  # Track peak RAM usage
+
+    def tensor_size(tensor):
+        """Calculate the size of a tensor in bytes."""
+        dtype_to_size = {
+            "int8": 1,
+            "uint8": 1,
+            "int16": 2,
+            "float16": 2,
+            "int32": 4,
+            "float32": 4,
+            "float64": 8,
+        }
+        dtype_size = dtype_to_size.get(tensor.dtype, 0)
+        num_elements = 1
+        for dim in tensor.shape:
+            num_elements *= dim
+        return num_elements * dtype_size
+
+    # Iterate through the layers
+    for layer in layers:
+        current_ram = 0
+
+        # Allocate memory for input tensors
+        for input_idx in layer.inputs:
+            tensor = next(t for t in tensors if t.idx == input_idx)
+            if tensor.idx not in memory_pool:  # Allocate if not already in memory
+                memory_pool[tensor.idx] = tensor_size(tensor)
+                current_ram += memory_pool[tensor.idx]
+
+        # Allocate memory for output tensors
+        for output_idx in layer.outputs:
+            tensor = next(t for t in tensors if t.idx == output_idx)
+            if tensor.idx not in memory_pool:  # Allocate if not already in memory
+                memory_pool[tensor.idx] = tensor_size(tensor)
+                current_ram += memory_pool[tensor.idx]
+
+        # Update peak RAM usage
+        peak_ram = max(peak_ram, sum(memory_pool.values()))
+
+        # Free memory for tensors no longer used
+        used_indices = {idx for l in layers for idx in l.inputs + l.outputs}
+        memory_pool = {idx: size for idx, size in memory_pool.items() if idx in used_indices}
+
+    ram_bytes = peak_ram
     return ram_bytes

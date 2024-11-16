@@ -24,7 +24,14 @@ def recall(matrix: tf.Tensor, idx: int) -> tf.Tensor:
     recall = None
 
     ### ENTER STUDENT CODE BELOW ###
+    # Extract the true positives for the category (diagonal element)
+    TP = matrix.numpy()[idx, idx]
 
+    # Sum all elements in the row corresponding to the category (actual occurrences of the category)
+    FN = sum(matrix.numpy()[idx, :]) - TP
+
+    # Compute recall: TP / (TP + FN), handling division by zero
+    recall = TP / (TP + FN + tf.keras.backend.epsilon())
     ### ENTER STUDENT CODE ABOVE ###
 
     return recall
@@ -49,7 +56,14 @@ def precision(matrix: tf.Tensor, idx: int) -> tf.Tensor:
     precision = None
 
     ### ENTER STUDENT CODE BELOW ###
+    # Extract the true positives for the category (diagonal element)
+    TP = matrix.numpy()[idx, idx]
 
+    # Sum all elements in the column corresponding to the category (all predicted occurrences of the category)
+    FP = sum(matrix.numpy()[:, idx]) - TP
+
+    # Compute precision: TP / (TP + FP), handling division by zero
+    precision = TP / (TP + FP + tf.keras.backend.epsilon())
     ### ENTER STUDENT CODE ABOVE ###
 
     return precision
@@ -74,7 +88,14 @@ def f1_score(matrix: tf.Tensor, idx: int) -> tf.Tensor:
     f1_score = None
 
     ### ENTER STUDENT CODE BELOW ###
+    # Compute Precision
+    precision_val = precision(matrix, idx) 
 
+    # Compute Recall
+    recall_val = recall(matrix, idx)
+
+    # Compute F1 Score
+    f1_score = 2 * (precision_val * recall_val) / (precision_val + recall_val + tf.keras.backend.epsilon())
     ### ENTER STUDENT CODE ABOVE ###
 
     return f1_score
