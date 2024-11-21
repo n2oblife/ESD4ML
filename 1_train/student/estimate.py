@@ -228,7 +228,6 @@ def estimate_rom(tensors: List[MyTensor]):
 
     return rom_bytes
 
-
 def estimate_ram(tensors: List[MyTensor], layers: List[MyLayer]):
     """Calculate the estimated number of bytes required to store model tensors in RAM.
 
@@ -253,67 +252,34 @@ def estimate_ram(tensors: List[MyTensor], layers: List[MyLayer]):
     - The input and output tensors of the whole model can also be considered for memory planning
 
     """
-
     ram_bytes = 0
 
     ### ENTER STUDENT CODE BELOW ###
-    #TODO implement greedy by size algorithm
-    for tensor in tensors[1:]:
-        if not tensor.is_const:
-            ram_bytes = max(tensor_size(tensor), ram_bytes)
-    ram_bytes = tensor_size(tensors[0]) + ram_bytes if not tensors[0].is_const else ram_bytes
-
-    ### ENTER STUDENT CODE ABOVE ###
-
-    return ram_bytes
-
-def estimate_ram_(tensors: List[MyTensor], layers: List[MyLayer]):
-    """Calculate the estimated number of bytes required to store model tensors in RAM."""
-    ram_bytes = 0
-    memory_pool = {}  # Dictionary to simulate buffer allocation
-    peak_ram = 0  # Track peak RAM usage
-
-    def tensor_size(tensor):
-        """Calculate the size of a tensor in bytes."""
-        dtype_to_size = {
-            "int8": 1,
-            "uint8": 1,
-            "int16": 2,
-            "float16": 2,
-            "int32": 4,
-            "float32": 4,
-            "float64": 8,
-        }
-        dtype_size = dtype_to_size.get(tensor.dtype, 0)
-        num_elements = 1
-        for dim in tensor.shape:
-            num_elements *= dim
-        return num_elements * dtype_size
+    # Gready by size algorithm
+    
+    # Initialize variables
+    memory_pool = {}    # Dictionary to simulate buffer allocation
+    peak_ram = 0        # Track peak RAM usage
 
     # Iterate through the layers
-    for layer in layers:
+    for layer_nb in range(len(layers)):
         current_ram = 0
 
-        # Allocate memory for input tensors
-        for input_idx in layer.inputs:
-            tensor = next(t for t in tensors if t.idx == input_idx)
-            if tensor.idx not in memory_pool:  # Allocate if not already in memory
-                memory_pool[tensor.idx] = tensor_size(tensor)
-                current_ram += memory_pool[tensor.idx]
+        for idx in layers[layer_nb].inputs + layers[layer_nb].outputs:
+            in_ram_tensors = [t for t in tensors if ((t.idx == idx) and (not t.is_const))] 
+            if len(in_ram_tensors) != 0:
+                for tensor in in_ram_tensors:
+                    if tensor.idx not in memory_pool:
+                        memory_pool[tensor.idx] = tensor_size(tensor)
+                        current_ram += memory_pool[tensor.idx]
 
-        # Allocate memory for output tensors
-        for output_idx in layer.outputs:
-            tensor = next(t for t in tensors if t.idx == output_idx)
-            if tensor.idx not in memory_pool:  # Allocate if not already in memory
-                memory_pool[tensor.idx] = tensor_size(tensor)
-                current_ram += memory_pool[tensor.idx]
-
-        # Update peak RAM usage
-        peak_ram = max(peak_ram, sum(memory_pool.values()))
+        peak_ram = max(peak_ram, sum(memory_pool.values())) 
 
         # Free memory for tensors no longer used
-        used_indices = {idx for l in layers for idx in l.inputs + l.outputs}
+        used_indices = {idx for l in layers[layer_nb+1:] for idx in l.inputs + l.outputs}
         memory_pool = {idx: size for idx, size in memory_pool.items() if idx in used_indices}
 
     ram_bytes = peak_ram
+    ### ENTER STUDENT CODE ABOVE ###
+
     return ram_bytes

@@ -89,7 +89,7 @@ def test_estimate_rom():
     assert estimate_rom(ALL_TENSORS) == 45840
 
 def test_estimate_ram():
-    # Trvial cases
+    # Trivial cases
     assert (
         estimate_ram(
             [MyTensor(0, "foo", [1, 1, 1, 1], "int8", True)], [MyLayer(0, "bar", [0], [0])]
