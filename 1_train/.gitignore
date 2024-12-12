@@ -8,3 +8,4 @@ __pycache__/
 accuracy.txt
 estimations.txt
 *.zip
+!submission_1.zip
