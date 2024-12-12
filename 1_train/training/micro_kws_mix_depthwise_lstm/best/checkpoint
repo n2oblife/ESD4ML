@@ -1,0 +1,2 @@
+model_checkpoint_path: "micro_kws_0.652_ckpt"
+all_model_checkpoint_paths: "micro_kws_0.652_ckpt"
