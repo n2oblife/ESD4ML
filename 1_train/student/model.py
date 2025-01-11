@@ -115,7 +115,8 @@ def create_arm_conv_model(model_settings: dict) -> tf.keras.Model:
 
     # Output layer with softmax activation.
     output = tf.keras.layers.Dense(units=model_settings["label_count"], activation="softmax")(x)
-    return output
+    model = tf.keras.Model(inputs, output)
+    return model
 
 
 def create_arm_low_latency_conv_model(model_settings: dict):
@@ -162,7 +163,8 @@ def create_arm_low_latency_conv_model(model_settings: dict):
 
     # Output layer.
     output = tf.keras.layers.Dense(units=model_settings["label_count"], activation="softmax")(x)
-    return output
+    model = tf.keras.Model(inputs, output)
+    return model
 
 def create_lstm_model(model_settings: dict):
     """Builds a MicroKWS model using LSTM layers with the keras API.
@@ -192,8 +194,8 @@ def create_lstm_model(model_settings: dict):
 
     ### Output layer
     output = tf.keras.layers.Dense(units=model_settings["label_count"], activation="softmax")(x)
-
-    return output
+    model = tf.keras.Model(inputs, output)
+    return model
 
 def create_mix_depthwise_lstm_model(model_settings: dict):
     """Builds a MicroKWS model using DepthwiseConv2D and LSTM layers.
@@ -252,4 +254,137 @@ def create_mix_depthwise_lstm_model(model_settings: dict):
     output = tf.keras.layers.Dense(
         units=model_settings["label_count"], activation="softmax", name="output_layer"
     )(x)
+    model = tf.keras.Model(inputs, output)
+    return model
+def create_arm_conv_model_2(model_settings: dict) -> tf.keras.Model:
+    """Builds a Convolutional model with the keras API."""
+
+    # Get relevant model settings.
+    input_frequency_size = model_settings["dct_coefficient_count"]
+    input_time_size = model_settings["spectrogram_length"]
+
+    inputs = tf.keras.Input(shape=(model_settings["fingerprint_size"]), name="input")
+
+    # Reshape the flattened input.
+    x = tf.reshape(inputs, shape=(-1, input_time_size, input_frequency_size, 1))
+
+    # First convolutional layer.
+    x = tf.keras.layers.DepthwiseConv2D(
+        filters=16,
+        kernel_size=(3, 3),
+        strides=(1, 1),
+        padding="SAME",
+        activation=None,
+    )(x)
+    x = tf.keras.layers.BiasAdd()(x)  # Explicit bias addition
+    x = tf.keras.layers.ReLU()(x)  # ReLU activation
+
+    # First max-pooling layer.
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding="SAME")(x)
+
+    # Second convolutional layer.
+    x = tf.keras.layers.depthwise_conv_2(
+        filters=32,
+        kernel_size=(3, 3),
+        strides=(1, 1),
+        padding="SAME",
+        activation=None,
+    )(x)
+    x = tf.keras.layers.BiasAdd()(x)  # Explicit bias addition
+    x = tf.keras.layers.ReLU()(x)  # ReLU activation
+
+    # Second max-pooling layer.
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding="SAME")(x)
+
+    # Flatten for the dense layer.
+    x = tf.keras.layers.Flatten()(x)
+
+    # Fully connected layer.
+    x = tf.keras.layers.Dense(units=128, activation=None)(x)
+    x = tf.keras.layers.BiasAdd()(x)  # Explicit bias addition
+
+    # Output layer with softmax activation.
+    output = tf.keras.layers.Dense(units=model_settings["label_count"], activation="softmax")(x)
+    model = tf.keras.Model(inputs, output)
+    return model
+def create_arm_low_latency_conv_model_2(model_settings: dict):
+    """Builds a Low Latency model with the keras API."""
+    # Get relevant model setting.
+    input_frequency_size = model_settings["dct_coefficient_count"]
+    input_time_size = model_settings["spectrogram_length"]
+
+    inputs = tf.keras.Input(shape=(model_settings["fingerprint_size"]), name="input")
+    # Reshape the flattened input.
+    x = tf.reshape(inputs, shape=(-1, input_time_size, input_frequency_size, 1))
+
+    # First convolutional layer.
+    x = tf.keras.layers.DepthwiseConv2D(
+        filters=16,
+        kernel_size=(5, 5),
+        strides=(1, 1),
+        padding="SAME",
+        activation=None,  # No activation here, we will add ReLU separately.
+    )(x)
+    x = tf.keras.layers.BiasAdd()(x)  # Explicit bias addition
+    x = tf.keras.layers.ReLU()(x)  # ReLU activation
+
+    # Flatten for the dense layers.
+    x = tf.keras.layers.Flatten()(x)
+
+    # Fully connected layer 1.
+    x = tf.keras.layers.Dense(units=128, activation=None)(x)
+    x = tf.keras.layers.BiasAdd()(x)  # Explicit bias addition
+    x = tf.keras.layers.ReLU()(x)  # ReLU activation
+    x = tf.keras.layers.Dropout(rate=0.3)(x)  # Add dropout for regularization
+
+    # Fully connected layer 2.
+    x = tf.keras.layers.Dense(units=64, activation=None)(x)
+    x = tf.keras.layers.BiasAdd()(x)  # Explicit bias addition
+    x = tf.keras.layers.ReLU()(x)  # ReLU activation
+    x = tf.keras.layers.Dropout(rate=0.3)(x)  # Add dropout for regularization
+
+    # Fully connected layer 3.
+    x = tf.keras.layers.Dense(units=32, activation=None)(x)
+    x = tf.keras.layers.BiasAdd()(x)  # Explicit bias addition
+    x = tf.keras.layers.ReLU()(x)  # ReLU activation
+    x = tf.keras.layers.Dropout(rate=0.3)(x)  # Add dropout for regularization
+
+    # Output layer.
+    output = tf.keras.layers.Dense(units=model_settings["label_count"], activation="softmax")(x)
+    model = tf.keras.Model(inputs, output)
+    return model
+def create_crnn_model(model_settings):
+    input_frequency_size = model_settings["dct_coefficient_count"]
+    input_time_size = model_settings["spectrogram_length"]
+
+    inputs = tf.keras.Input(shape=(model_settings["fingerprint_size"]), name="input")
+    x = tf.reshape(inputs, shape=(-1, input_time_size, input_frequency_size, 1))
+
+    x = tf.keras.layers.Conv2D(32, (3, 3), padding="same", activation="relu")(x)
+    x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+    x = tf.keras.layers.Reshape((-1, input_frequency_size * 16))(x)
+
+    x = tf.keras.layers.LSTM(64, return_sequences=True, activation="tanh")(x)
+    x = tf.keras.layers.LSTM(32, activation="tanh")(x)
+
+    output = tf.keras.layers.Dense(model_settings["label_count"], activation="softmax")(x)
     return output
+def create_attention_crnn_model(model_settings):
+    input_frequency_size = model_settings["dct_coefficient_count"]
+    input_time_size = model_settings["spectrogram_length"]
+
+    inputs = tf.keras.Input(shape=(model_settings["fingerprint_size"]), name="input")
+    x = tf.reshape(inputs, shape=(-1, input_time_size, input_frequency_size, 1))
+
+    x = tf.keras.layers.Conv2D(32, (3, 3), padding="same", activation="relu")(x)
+    x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+    x = tf.keras.layers.Reshape((-1, input_frequency_size * 16))(x)
+
+    x = tf.keras.layers.LSTM(64, return_sequences=True, activation="tanh")(x)
+    attention = tf.keras.layers.Dense(1, activation="softmax")(x)
+    x = tf.keras.layers.Multiply()([x, attention])
+    x = tf.keras.layers.LSTM(32, activation="tanh")(x)
+
+    outputs = tf.keras.layers.Dense(model_settings["label_count"], activation="softmax")(x)
+    model = tf.keras.Model(inputs, outputs)
+    return model

@@ -3,9 +3,9 @@
 venv/
 .env/
 env/
-models/*
 __pycache__/
 *.pyc
 accuracy.txt
 estimations.txt
 *.zip
+!submission_1.zip
