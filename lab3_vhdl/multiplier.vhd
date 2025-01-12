@@ -137,12 +137,12 @@ begin
    -- Details : procedure should have a delay of g_dataWidth clock cycle if clocked
    -- and can handle one bit augmentation at the end
    procedure p_CLA(
-      signal i_A : in std_logic_vector(g_dataWidth-1 downto 0);
-      signal i_B : in std_logic_vector(g_dataWidth-1 downto 0);
-      signal i_C: in std_logic;
-      signal o_S : out std_logic_vector(g_dataWidth downto 0);
-      signal o_C : out std_logic;
-      constant dataWidth : integer
+      signal i_A           : in std_logic_vector(g_dataWidth-1 downto 0);
+      signal i_B           : in std_logic_vector(g_dataWidth-1 downto 0);
+      signal i_C           : in std_logic;
+      signal o_S           : out std_logic_vector(g_dataWidth downto 0);
+      signal o_C           : out std_logic;
+      constant dataWidth   : integer
    ) is
       variable s_C : std_logic_vector(1 to g_dataWidth-1); -- TODO : check if works with signal if error
    begin
@@ -156,7 +156,7 @@ begin
       p_partial_full_adder(i_A(i_A'left), i_B(i_B'left), s_C(s_C'high), o_S(o_S'left-1), o_C);
       -- final output
       o_S(o_S'left) <= o_C;
-   end procedure p_eight_bit_CLA;
+   end procedure p_CLA;
 
 
    -- bit by bit multiplier
@@ -186,7 +186,6 @@ begin
          o_S(g_dataWidth-1 downto 0)   <= (others => '0');
          o_S(g_dataWidth)              <= '1';
       end if;
-      
    end procedure p_bit_word_multiplier;
 
 
@@ -198,19 +197,29 @@ begin
       signal i_B : in std_logic_vector(g_dataWidth-1 downto 0);
       signal o_S : out std_logic_vector(2*g_dataWidth-1 downto 0)
    ) is
-      variable s_C : std_logic_vector(1 to g_dataWidth-1); -- TODO : check if works with signal if error
-      variable s_P               : array(0 to g_dataWidth-1) of std_logic_vector(g_dataWidth downto 0);
-      variable s_accZ0, s_accZ1  : std_logic_vector(g_dataWidth downto 0);
+      variable s_C      : array(0 to g_dataWidth-1) of std_logic; -- TODO : check if works with signal if error
+      variable s_P      : array(0 to g_dataWidth-1) of std_logic_vector(g_dataWidth downto 0);
+      variable s_acc    : array(0 to g_dataWidth-1) of std_logic_vector(g_dataWidth downto 0);
    begin
-      for i in 0 to g_dataWidth-1 loop
+      -- 1st stage
+      p_bit_word_multiplier(i_A(0), i_B, s_P(0));
+      p_bit_word_multiplier(i_A(1), i_B, s_P(1));
+      p_CLA(s_P(0)('0' & s_P'high downto s_P'low+1), s_P(1), c_carry_null, s_acc(0), s_C(0), g_dataWidth);
+      o_S(0) <= s_P(0);
+
+      -- stage 2 to before last
+      for i in 2 to g_dataWidth-1 loop
          p_bit_word_multiplier(i_A(i), i_B, s_P(i));
+         o_S() -- TODO : finish this
       end loop;
+
+      -- last stage
 
       for i in 0 to g_dataWidth-1 loop
          -- need some padding when adding
          p_CLA(s_accZ0, s_P(i+1), c_carry_null, s_accZ1)
       end loop;
-   end procedure p_NS_NS_multiplier;
+   end procedure p_multiplier;
 
 -------------------------------------------------------------------------------------------------
 end architecture IP_multiplier;
