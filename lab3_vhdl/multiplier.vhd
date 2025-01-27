@@ -131,6 +131,14 @@ begin
       o_C <= (i_A and i_B) or ((i_A or i_B) and i_C);
    end procedure p_partial_full_adder;
 
+   procedure p_one_complement(
+      signal i_A : in std_logic_vector;
+      signal o_A : out std_logic_vector
+   ) is
+   begin
+      o_A <= not(i_A(i_A'high downto 1) & '1');
+   end procedure p_one_complement;
+
 
    -- generic Carry Lookahead Adder
    -- Process Description : CLA for generic signals and data width
@@ -184,11 +192,12 @@ begin
       for i in 0 to dataWidth-1 loop
          p_bit_bit_multiplier(i_A, i_B(i), o_S(i));
       end loop;
-      -- extrem case with all 1 and multiplication by 2
-      if (i_A and (i_B = (others => '1'))) then
-         o_S(o_S'high-1 downto o_S'low)   <= (others => '0');
-         o_S(o_S'high)                    <= '1';
-      end if;
+      -- IM DUMB
+      -- -- extrem case with all 1 and multiplication by 2
+      -- if (i_A and (i_B = (others => '1'))) then
+      --    o_S(o_S'high-1 downto o_S'low)   <= (others => '0');
+      --    o_S(o_S'high)                    <= '1';
+      -- end if;
    end procedure p_bit_word_multiplier;
 
 
@@ -279,7 +288,7 @@ begin
       end loop;
 
       -- last stage
-      p_bit_word_multiplier(i_A(i_A'high), i_B, s_P(dataWidth-1));
+      s_P(dataWidth-1) := p_one_complement(i_B); 
       p_CLA(
          '0' & s_acc(s_acc'high)(s_acc(s_acc'high)'high downto 1),
          s_P(s_P'high) & '0',
@@ -302,15 +311,53 @@ begin
          
          -- signed and vectorized
          if i_S and i_V then
+            -- MSB part
+            if (i_A(c_dataWidth-1)='1' and i_B(c_dataWidth-1)='0') then
+               p_sig_multiplier(i_A(c_dataWidth-1 downto c_dataWidth/2), i_B(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
+            end if;
+            
+            if (i_A(c_dataWidth-1)='0' and i_B(c_dataWidth-1)='1') then
+               p_sig_multiplier(i_B(c_dataWidth-1 downto c_dataWidth/2), i_A(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
+            end if;
+
+            if (i_A(c_dataWidth-1) = i_B(c_dataWidth-1)) then 
+               p_uns_multiplier( '0' & i_A(c_dataWidth-2 downto c_dataWidth/2), '0' & i_B(c_dataWidth-2 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
+            end if;
+
+            -- LSB part
+            if (i_A(c_dataWidth/2-1)='1' and i_B(c_dataWidth/2-1)='0') then
+               p_sig_multiplier(i_A(c_dataWidth/2-1 downto 0), i_B(c_dataWidth/2-1 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
+            end if;
+            
+            if (i_A(c_dataWidth/2-1)='0' and i_B(c_dataWidth/2-1)='1') then
+               p_sig_multiplier(i_B(c_dataWidth/2-1 downto 0), i_A(c_dataWidth/2-1 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
+            end if;
+
+            if (i_A(c_dataWidth/2-1) = i_B(c_dataWidth/2-1)) then 
+               p_uns_multiplier( '0' & i_A(c_dataWidth/2-2 downto 0), '0' & i_B(c_dataWidth/2-2 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
+            end if;
          end if;
 
          -- unsigned and vectorized
          if (not i_S) and i_V then
+            p_uns_multiplier(i_A(c_dataWidth-1 downto c_dataWidth/2), i_B(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
+            p_uns_multiplier(i_A(c_dataWidth/2-1 downto 0), i_B(c_dataWidth/2-1 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
          end if;
 
          -- signed and unvectorized
          if i_S and (not i_V) then
-            p_multiplier(i_A, i_B, o_Y, c_dataWidth);
+
+            if (i_A(i_A'high)='1' and i_B(i_B'high)='0') then
+               p_sig_multiplier(i_A, i_B, o_Y, c_dataWidth);               
+            end if;
+            
+            if (i_A(i_A'high)='0' and i_B(i_B'high)='1') then
+               p_sig_multiplier(i_B, i_A, o_Y, c_dataWidth);               
+            end if;
+
+            if (i_A(i_A'high) = i_B(i_B'high)) then 
+               p_uns_multiplier('0' & i_A(i_A'high-1 downto 0), '0' & i_B(i_B'high-1 downto 0), o_Y, c_dataWidth);               
+            end if;
          end if;
 
          p_uns_multiplier(i_A, i_B, o_Y, c_dataWidth);

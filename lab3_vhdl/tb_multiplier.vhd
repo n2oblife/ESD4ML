@@ -43,35 +43,164 @@
 --
 -------------------------------------------------------------------------------------------------
 
-
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
-
--- Uncomment the following library declaration if using
--- arithmetic functions with Signed or Unsigned values
-USE IEEE.NUMERIC_BIT.ALL;
-
--- Uncomment the following library declaration if instantiating
--- any Xilinx leaf cells in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity tb_multiplier is
---  Port ( );
-end tb_multiplier;
+end entity tb_multiplier;
 
-architecture behavioral of tb_multiplier is
+architecture behavior of tb_multiplier is
+    -- Constants
+    constant c_dataWidth : integer := 8; -- Data width of inputs
+    
+    -- Component Declaration
+    component multiplier
+        generic(
+            g_dataWidth : integer := 8
+        );
+        port(
+            i_A     : in std_logic_vector(g_dataWidth-1 downto 0);
+            i_B     : in std_logic_vector(g_dataWidth-1 downto 0);
+            i_S     : in std_logic;                               
+            i_V     : in std_logic;                               
+            o_Y     : out std_logic_vector(2*g_dataWidth-1 downto 0);
+            Y_test  : out std_logic_vector(2*g_dataWidth-1 downto 0)
+        );
+    end component;
+
+    -- Signals for DUT
+    signal s_A, s_B        : std_logic_vector(c_dataWidth-1 downto 0);
+    signal s_S, s_V        : std_logic;
+    signal s_o_Y, s_Y_test : std_logic_vector(2*c_dataWidth-1 downto 0);
 
 begin
+    -- DUT instantiation
+    uut: multiplier
+        generic map(
+            g_dataWidth => c_dataWidth
+        )
+        port map(
+            i_A     => s_A,
+            i_B     => s_B,
+            i_S     => s_S,
+            i_V     => s_V,
+            o_Y     => s_o_Y,
+            Y_test  => s_Y_test
+        );
 
---- ENTER STUDENT CODE BELOW ---
+    -- Stimulus Process
+    stimulus: process
+    begin
+        -- Test Case 1: Unsigned multiplication (no vectorization)
+        s_A <= "00010110"; -- 22 in decimal
+        s_B <= "00000011"; -- 3 in decimal
+        s_S <= '0';        -- Unsigned
+        s_V <= '0';        -- No vectorization
+        wait for 10 ns;
+        
+        -- Test Case 2: Signed multiplication (no vectorization)
+        s_A <= "11110110"; -- -10 in decimal (2's complement)
+        s_B <= "00000101"; -- 5 in decimal
+        s_S <= '1';        -- Signed
+        s_V <= '0';        -- No vectorization
+        wait for 10 ns;
 
+        -- Test Case 3: Unsigned vectorized multiplication
+        s_A <= "11001100"; -- 204 in decimal
+        s_B <= "01010101"; -- 85 in decimal
+        s_S <= '0';        -- Unsigned
+        s_V <= '1';        -- Vectorization enabled
+        wait for 10 ns;
 
+        -- Test Case 4: Signed vectorized multiplication
+        s_A <= "11101100"; -- -20 in decimal (2's complement for high nibble)
+        s_B <= "00100101"; -- 37 in decimal
+        s_S <= '1';        -- Signed
+        s_V <= '1';        -- Vectorization enabled
+        wait for 10 ns;
 
+        -- Additional Test Cases --
 
+        -- Test Case 5: Edge case - All zero inputs
+        s_A <= "00000000";
+        s_B <= "00000000";
+        s_S <= '0';
+        s_V <= '0';
+        wait for 10 ns;
 
-UUT1: entity work.multiplier(behavioral) port map(); -- Complete port map!
-UUT2: entity work.multiplier(dataflow)   port map(); -- Complete port map!
---- ENTER STUDENT CODE ABOVE ---
+        -- Test Case 6: Edge case - Maximum unsigned values
+        s_A <= "11111111"; -- 255 in decimal
+        s_B <= "11111111"; -- 255 in decimal
+        s_S <= '0';
+        s_V <= '0';
+        wait for 10 ns;
 
-end Behavioral;
+        -- Test Case 7: Random values (unsigned, no vectorization)
+        s_A <= "10101010"; -- 170 in decimal
+        s_B <= "01110101"; -- 117 in decimal
+        s_S <= '0';
+        s_V <= '0';
+        wait for 10 ns;
+
+        -- Test Case 8: Random values (signed, no vectorization)
+        s_A <= "11011010"; -- -38 in decimal (2's complement)
+        s_B <= "00110011"; -- 51 in decimal
+        s_S <= '1';
+        s_V <= '0';
+        wait for 10 ns;
+
+        -- Test Case 9: Mixed vectorized multiplication (unsigned)
+        s_A <= "10011110"; -- 158 in decimal
+        s_B <= "01100011"; -- 99 in decimal
+        s_S <= '0';
+        s_V <= '1';
+        wait for 10 ns;
+
+        -- Test Case 10: Mixed vectorized multiplication (signed)
+        s_A <= "10111101"; -- -67 in decimal (2's complement high nibble)
+        s_B <= "01111110"; -- 126 in decimal
+        s_S <= '1';
+        s_V <= '1';
+        wait for 10 ns;
+
+        -- Test Case 11: Edge case - Single-bit inputs
+        s_A <= "00000001"; -- 1 in decimal
+        s_B <= "00000001"; -- 1 in decimal
+        s_S <= '0';
+        s_V <= '0';
+        wait for 10 ns;
+
+        -- Test Case 12: Edge case - All bits set except one
+        s_A <= "11111110"; -- 254 in decimal
+        s_B <= "01111111"; -- 127 in decimal
+        s_S <= '0';
+        s_V <= '0';
+        wait for 10 ns;
+
+        -- Test Case 13: Random large numbers in signed mode
+        s_A <= "10000110"; -- -122 in decimal (2's complement)
+        s_B <= "11101001"; -- -23 in decimal (2's complement)
+        s_S <= '1';
+        s_V <= '0';
+        wait for 10 ns;
+
+        -- Test Case 14: Random values in vectorized mode (signed)
+        s_A <= "11001111"; -- -49 (high nibble), 15 (low nibble)
+        s_B <= "00110101"; -- 53 (high nibble), 5 (low nibble)
+        s_S <= '1';
+        s_V <= '1';
+        wait for 10 ns;
+
+        -- Test Case 15: Check overflow behavior (unsigned)
+        s_A <= "11111111"; -- Max unsigned value
+        s_B <= "00000010"; -- 2 in decimal
+        s_S <= '0';
+        s_V <= '0';
+        wait for 10 ns;
+
+        -- Stop simulation
+        wait;
+    end process;
+
+end architecture behavior;
