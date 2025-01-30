@@ -15,7 +15,7 @@
 -------------------------------------------------------------------------------------------------
 -- Description: An array multiplier using basic techniques such as bit-by-bit partial product computation, 
 --              Ripple Carry Adders (RCA), or Carry Save Adders (CSA), 
---              with support for two’s complement arithmetic and modular vectorization
+--              with support for two's complement arithmetic and modular vectorization
 --
 -- Limitations: The design excludes advanced optimizations like Booth encoding and tree structures, 
 --              leading to limitations in speed, scalability, and efficiency
@@ -56,12 +56,12 @@ use ieee.numeric_std.all;
 -------------------------------------------------------------------------------------------------
 entity multiplier is
    generic(
-      g_dataWidth : integer := 8;      -- Depth of data
+      g_dataWidth : integer := 8       -- Depth of data
    );
     Port (
       -- CONTROL
-      -- clk   : in std_logic;                                 -- standard clk signal 
-      -- reset : in std_logic;                                 -- standard reset signal
+      clk   : in std_logic;                                 -- standard clk signal 
+      reset : in std_logic;                                 -- standard reset signal
       
       -- INPUTS
       i_A     : in std_logic_vector(g_dataWidth-1 downto 0);
@@ -71,7 +71,7 @@ entity multiplier is
 
       -- OUTPUTS
       o_Y     : out std_logic_vector(2*g_dataWidth-1 downto 0);
-      Y_test  : out std_logic_vector(2*g_dataWidth-1 downto 0);
+      Y_test  : out std_logic_vector(2*g_dataWidth-1 downto 0)
    );
 -------------------------------------------------------------------------------------------------
 end entity multiplier;
@@ -85,6 +85,9 @@ end entity multiplier;
 -------------------------------------------------------------------------------------------------
 architecture IP_multiplier of multiplier is
 
+type t_bit_array is array(0 to dataWidth-1) of std_logic;
+type t_vec_array is array(0 to dataWidth-1) of std_logic_vector;
+
 -------------------------------------------------------------------------------------------------
 -- CONSTANTS
 -------------------------------------------------------------------------------------------------
@@ -95,7 +98,6 @@ architecture IP_multiplier of multiplier is
 -------------------------------------------------------------------------------------------------
 -- SIGNALS
 -------------------------------------------------------------------------------------------------
-
 
 -------------------------------------------------------------------------------------------------
 -- COMPONENTS
@@ -110,13 +112,14 @@ begin
 -- MAPPING
 -------------------------------------------------------------------------------------------------
    
+   
 -------------------------------------------------------------------------------------------------
 -- PROCESS
 -------------------------------------------------------------------------------------------------
 
 
    -- 1-bit Partial Full Adder, used in the CLA
-   procedure p_partial_full_adder(
+   procedure p_partial_full_adder (
       signal i_A : in std_logic;
       signal i_B : in std_logic;
       signal i_C : in std_logic;
@@ -131,7 +134,8 @@ begin
       o_C <= (i_A and i_B) or ((i_A or i_B) and i_C);
    end procedure p_partial_full_adder;
 
-   procedure p_one_complement(
+
+   procedure p_one_complement return std_logic(
       signal i_A : in std_logic_vector;
       signal o_A : out std_logic_vector
    ) is
@@ -151,9 +155,9 @@ begin
       signal i_C           : in std_logic;
       signal o_S           : out std_logic_vector;
       signal o_C           : out std_logic;
-      constant dataWidth   : integer
+      constant dataWidth   : in integer
    ) is
-      variable s_C : std_logic_vector(0 to dataWidth-2); -- TODO : check if works with signal if error
+      variable s_C : std_logic_vector(0 to dataWidth-2) -- TODO : check if works with signal if error
    begin
       -- 1st stage
       p_partial_full_adder(i_A(0), i_B(0), i_C, o_S(0), s_C(0));
@@ -211,9 +215,9 @@ begin
       signal o_S           : out std_logic_vector;
       constant dataWidth   : integer
    ) is
-      variable s_C   : array(0 to dataWidth-1) of std_logic;
-      variable s_P   : array(0 to dataWidth-1) of std_logic_vector;
-      variable s_acc : array(0 to dataWidth-1) of std_logic_vector;
+      variable s_C   : t_bit_array;
+      variable s_P   : t_vec_array;
+      variable s_acc : t_vec_array;
    begin
       -- 1st stage
       p_bit_word_multiplier(i_A(0), i_B, s_P(0));
@@ -259,9 +263,9 @@ begin
       signal o_S           : out std_logic_vector;
       constant dataWidth   : integer
    ) is
-      variable s_C   : array(0 to dataWidth-1) of std_logic;
-      variable s_P   : array(0 to dataWidth-1) of std_logic_vector;
-      variable s_acc : array(0 to dataWidth-1) of std_logic_vector;
+      variable s_C   : t_bit_array;
+      variable s_P   : t_vec_array;
+      variable s_acc : t_vec_array;
    begin
       -- 1st stage
       p_bit_word_multiplier(i_A(0), i_B, s_P(0));
@@ -310,7 +314,7 @@ begin
       if rising_edge(clk) then
          
          -- signed and vectorized
-         if i_S and i_V then
+         if (i_S='1') and (i_V='1') then
             -- MSB part
             if (i_A(c_dataWidth-1)='1' and i_B(c_dataWidth-1)='0') then
                p_sig_multiplier(i_A(c_dataWidth-1 downto c_dataWidth/2), i_B(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
@@ -339,13 +343,13 @@ begin
          end if;
 
          -- unsigned and vectorized
-         if (not i_S) and i_V then
+         if (i_S='0') and (i_V='1') then
             p_uns_multiplier(i_A(c_dataWidth-1 downto c_dataWidth/2), i_B(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
             p_uns_multiplier(i_A(c_dataWidth/2-1 downto 0), i_B(c_dataWidth/2-1 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
          end if;
 
          -- signed and unvectorized
-         if i_S and (not i_V) then
+         if (i_S='1') and (i_V='0') then
 
             if (i_A(i_A'high)='1' and i_B(i_B'high)='0') then
                p_sig_multiplier(i_A, i_B, o_Y, c_dataWidth);               
@@ -359,10 +363,13 @@ begin
                p_uns_multiplier('0' & i_A(i_A'high-1 downto 0), '0' & i_B(i_B'high-1 downto 0), o_Y, c_dataWidth);               
             end if;
          end if;
-
-         p_uns_multiplier(i_A, i_B, o_Y, c_dataWidth);
+        
+         -- unsigned and unvectorized
+         if (i_S='0') and (i_V='0') then 
+            p_uns_multiplier(i_A, i_B, o_Y, c_dataWidth);
+         end if;
          
-         if reset then
+         if reset='1' then
             o_Y <= (others => '0');
          end if;
       end if;

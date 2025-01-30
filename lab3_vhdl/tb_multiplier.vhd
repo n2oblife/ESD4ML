@@ -53,6 +53,7 @@ end entity tb_multiplier;
 architecture behavior of tb_multiplier is
     -- Constants
     constant c_dataWidth : integer := 8; -- Data width of inputs
+    constant c_clock_period : time := 1ns;
     
     -- Component Declaration
     component multiplier
@@ -60,14 +61,24 @@ architecture behavior of tb_multiplier is
             g_dataWidth : integer := 8
         );
         port(
+            -- ctrl signal
+            clk   : in std_logic;                                 -- standard clk signal 
+            reset : in std_logic;                                 -- standard reset signal
+            
+            -- INPUT
             i_A     : in std_logic_vector(g_dataWidth-1 downto 0);
             i_B     : in std_logic_vector(g_dataWidth-1 downto 0);
             i_S     : in std_logic;                               
-            i_V     : in std_logic;                               
+            i_V     : in std_logic; 
+            
+            -- OUTPUT                              
             o_Y     : out std_logic_vector(2*g_dataWidth-1 downto 0);
             Y_test  : out std_logic_vector(2*g_dataWidth-1 downto 0)
         );
     end component;
+
+    -- signal for ctrl
+    signal clk, reset          : std_logic := '0';
 
     -- Signals for DUT
     signal s_A, s_B        : std_logic_vector(c_dataWidth-1 downto 0);
@@ -81,6 +92,8 @@ begin
             g_dataWidth => c_dataWidth
         )
         port map(
+            clk     => clk,
+            reset   => reset,
             i_A     => s_A,
             i_B     => s_B,
             i_S     => s_S,
@@ -88,6 +101,9 @@ begin
             o_Y     => s_o_Y,
             Y_test  => s_Y_test
         );
+
+    -- clk process
+    clk     <= not clk after c_clock_period/2;          -- FPGA clk should be at 27MHz
 
     -- Stimulus Process
     stimulus: process
@@ -97,28 +113,28 @@ begin
         s_B <= "00000011"; -- 3 in decimal
         s_S <= '0';        -- Unsigned
         s_V <= '0';        -- No vectorization
-        wait for 10 ns;
+        wait for 10*c_clock_period;
         
         -- Test Case 2: Signed multiplication (no vectorization)
         s_A <= "11110110"; -- -10 in decimal (2's complement)
         s_B <= "00000101"; -- 5 in decimal
         s_S <= '1';        -- Signed
         s_V <= '0';        -- No vectorization
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 3: Unsigned vectorized multiplication
         s_A <= "11001100"; -- 204 in decimal
         s_B <= "01010101"; -- 85 in decimal
         s_S <= '0';        -- Unsigned
         s_V <= '1';        -- Vectorization enabled
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 4: Signed vectorized multiplication
         s_A <= "11101100"; -- -20 in decimal (2's complement for high nibble)
         s_B <= "00100101"; -- 37 in decimal
         s_S <= '1';        -- Signed
         s_V <= '1';        -- Vectorization enabled
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Additional Test Cases --
 
@@ -127,77 +143,77 @@ begin
         s_B <= "00000000";
         s_S <= '0';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 6: Edge case - Maximum unsigned values
         s_A <= "11111111"; -- 255 in decimal
         s_B <= "11111111"; -- 255 in decimal
         s_S <= '0';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 7: Random values (unsigned, no vectorization)
         s_A <= "10101010"; -- 170 in decimal
         s_B <= "01110101"; -- 117 in decimal
         s_S <= '0';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 8: Random values (signed, no vectorization)
         s_A <= "11011010"; -- -38 in decimal (2's complement)
         s_B <= "00110011"; -- 51 in decimal
         s_S <= '1';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 9: Mixed vectorized multiplication (unsigned)
         s_A <= "10011110"; -- 158 in decimal
         s_B <= "01100011"; -- 99 in decimal
         s_S <= '0';
         s_V <= '1';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 10: Mixed vectorized multiplication (signed)
         s_A <= "10111101"; -- -67 in decimal (2's complement high nibble)
         s_B <= "01111110"; -- 126 in decimal
         s_S <= '1';
         s_V <= '1';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 11: Edge case - Single-bit inputs
         s_A <= "00000001"; -- 1 in decimal
         s_B <= "00000001"; -- 1 in decimal
         s_S <= '0';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 12: Edge case - All bits set except one
         s_A <= "11111110"; -- 254 in decimal
         s_B <= "01111111"; -- 127 in decimal
         s_S <= '0';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 13: Random large numbers in signed mode
         s_A <= "10000110"; -- -122 in decimal (2's complement)
         s_B <= "11101001"; -- -23 in decimal (2's complement)
         s_S <= '1';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 14: Random values in vectorized mode (signed)
         s_A <= "11001111"; -- -49 (high nibble), 15 (low nibble)
         s_B <= "00110101"; -- 53 (high nibble), 5 (low nibble)
         s_S <= '1';
         s_V <= '1';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Test Case 15: Check overflow behavior (unsigned)
         s_A <= "11111111"; -- Max unsigned value
         s_B <= "00000010"; -- 2 in decimal
         s_S <= '0';
         s_V <= '0';
-        wait for 10 ns;
+        wait for 10*c_clock_period;
 
         -- Stop simulation
         wait;
