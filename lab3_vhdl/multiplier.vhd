@@ -21,35 +21,10 @@
 --              leading to limitations in speed, scalability, and efficiency
 --
 -------------------------------------------------------------------------------------------------
--- Naming conventions:
---
--- i_Port: Input entity port
--- o_Port: Output entity port
--- b_Port: Bidirectional entity port
--- g_My_Generic: Generic entity port
---
--- c_My_Constant: Constant definition
--- t_My_Type: Custom type definition
---
--- sc_My_Signal : Signal between components
--- My_Signal_n: Active low signal
--- v_My_Variable: Variable
--- sm_My_Signal: FSM signal
--- pkg_Param: Element Param coming from a package
---
--- My_Signal_re: Rising edge detection of My_Signal
--- My_Signal_fe: Falling edge detection of My_Signal
--- My_Signal_rX: X times registered My_Signal signal
--- My_Signal_Z<n>: Z times delayed My_Signal signal
---
--- p_Process_Name: Process
---
--------------------------------------------------------------------------------------------------
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-
 
 -------------------------------------------------------------------------------------------------
 -- ENTITY MULTIPLIER
@@ -73,340 +48,228 @@ entity multiplier is
       o_Y     : out std_logic_vector(2*g_dataWidth-1 downto 0);
       Y_test  : out std_logic_vector(2*g_dataWidth-1 downto 0)
    );
--------------------------------------------------------------------------------------------------
 end entity multiplier;
--------------------------------------------------------------------------------------------------
-
-
-
 
 -------------------------------------------------------------------------------------------------
 -- ARCHITECTURE IP_MULTIPLIER
 -------------------------------------------------------------------------------------------------
 architecture IP_multiplier of multiplier is
 
-type t_bit_array is array(0 to dataWidth-1) of std_logic;
-type t_vec_array is array(0 to dataWidth-1) of std_logic_vector;
+-- Fixed type declarations
+type t_bit_array is array(0 to g_dataWidth-1) of std_logic;
+type t_vec_array is array(0 to g_dataWidth-1) of std_logic_vector(g_dataWidth downto 0);
 
 -------------------------------------------------------------------------------------------------
 -- CONSTANTS
 -------------------------------------------------------------------------------------------------
-
-   constant c_dataWidth    : integer := g_dataWidth;                                      -- data width
-   constant c_carry_null   : std_logic := '0';                                            -- initial carry
+   constant c_dataWidth    : integer := g_dataWidth;
+   constant c_carry_null   : std_logic := '0';
 
 -------------------------------------------------------------------------------------------------
 -- SIGNALS
 -------------------------------------------------------------------------------------------------
 
--------------------------------------------------------------------------------------------------
--- COMPONENTS
--------------------------------------------------------------------------------------------------
-
-
--------------------------------------------------------------------------------------------------
 begin
--------------------------------------------------------------------------------------------------
 
--------------------------------------------------------------------------------------------------
--- MAPPING
--------------------------------------------------------------------------------------------------
-   
-   
--------------------------------------------------------------------------------------------------
--- PROCESS
--------------------------------------------------------------------------------------------------
-
-
-   -- 1-bit Partial Full Adder, used in the CLA
+   -- 1-bit Partial Full Adder procedure
    procedure p_partial_full_adder (
-      signal i_A : in std_logic;
-      signal i_B : in std_logic;
-      signal i_C : in std_logic;
-      signal o_S : out std_logic;
-      signal o_C : out std_logic
+      variable i_A : in  std_logic;
+      variable i_B : in  std_logic;
+      variable i_C : in  std_logic;
+      variable o_S : out std_logic;
+      variable o_C : out std_logic
    ) is
    begin
-      o_S <= (i_A xor i_B) xor i_C;
-      -- o_P <= i_A or i_B;
-      -- o_G <= i_A and i_B;
-      -- o_C <= o_G or (o_P and i_C);
-      o_C <= (i_A and i_B) or ((i_A or i_B) and i_C);
+      o_S := (i_A xor i_B) xor i_C;
+      o_C := (i_A and i_B) or ((i_A or i_B) and i_C);
    end procedure p_partial_full_adder;
 
-
-   procedure p_one_complement return std_logic(
-      signal i_A : in std_logic_vector;
-      signal o_A : out std_logic_vector
+   -- Two's complement procedure
+   procedure p_twos_complement (
+      variable i_A : in  std_logic_vector;
+      variable o_A : out std_logic_vector
    ) is
+      variable temp_carry : std_logic;
+      variable temp_sum   : std_logic;
    begin
-      o_A <= not(i_A(i_A'high downto 1) & '1');
-   end procedure p_one_complement;
-
-
-   -- generic Carry Lookahead Adder
-   -- Process Description : CLA for generic signals and data width
-   -- Details : procedure should have a delay of g_dataWidth clock cycle if clocked
-   -- and can handle one bit augmentation at the end using the carry signal
-   -- This procedure doesn't have a data width limitation and can be used for any data width
-   procedure p_CLA(
-      signal i_A           : in std_logic_vector;
-      signal i_B           : in std_logic_vector;
-      signal i_C           : in std_logic;
-      signal o_S           : out std_logic_vector;
-      signal o_C           : out std_logic;
-      constant dataWidth   : in integer
-   ) is
-      variable s_C : std_logic_vector(0 to dataWidth-2) -- TODO : check if works with signal if error
-   begin
-      -- 1st stage
-      p_partial_full_adder(i_A(0), i_B(0), i_C, o_S(0), s_C(0));
-      -- stage 2 to before last
-      for i in 1 to dataWidth-2 loop
-         p_partial_full_adder(i_A(i), i_B(i), s_C(i), o_S(i), s_C(i));
+      -- First invert all bits
+      for i in i_A'range loop
+         o_A(i) := not i_A(i);
       end loop;
-      -- last stage
-      p_partial_full_adder(i_A(i_A'high), i_B(i_B'high), s_C(s_C'high), o_S(o_S'high), o_C);
+      
+      -- Then add 1
+      temp_carry := '1';
+      for i in 0 to i_A'high loop
+         temp_sum := o_A(i) xor temp_carry;
+         temp_carry := o_A(i) and temp_carry;
+         o_A(i) := temp_sum;
+      end loop;
+   end procedure p_twos_complement;
+
+   -- Generic Carry Lookahead Adder procedure
+   procedure p_CLA(
+      variable i_A         : in  std_logic_vector;
+      variable i_B         : in  std_logic_vector;
+      variable i_C         : in  std_logic;
+      variable o_S         : out std_logic_vector;
+      variable o_C         : out std_logic;
+      constant dataWidth   : in  integer
+   ) is
+      variable s_C : std_logic_vector(0 to dataWidth);
+   begin
+      s_C(0) := i_C;
+      
+      for i in 0 to dataWidth-1 loop
+         p_partial_full_adder(i_A(i), i_B(i), s_C(i), o_S(i), s_C(i+1));
+      end loop;
+      
+      o_C := s_C(dataWidth);
    end procedure p_CLA;
 
-
-   -- bit by bit multiplier
+   -- Bit by bit multiplier (AND gate)
    procedure p_bit_bit_multiplier(
-      signal i_A           : in std_logic;
-      signal i_B           : in std_logic;
-      signal o_S           : out std_logic;
-      constant dataWidth   : integer
+      variable i_A : in  std_logic;
+      variable i_B : in  std_logic;
+      variable o_S : out std_logic
    ) is
    begin 
-      o_S <= i_A and i_B;
+      o_S := i_A and i_B;
    end procedure p_bit_bit_multiplier;
 
-
-   -- bit by word multiplier
-   -- details : should ensure that the output is a vector of the one more bit size
-   -- This procedure doesn't have a data width limitation and can be used for any data width
+   -- Bit by word multiplier
    procedure p_bit_word_multiplier(
-      signal i_A           : in std_logic;
-      signal i_B           : in std_logic_vector;
-      signal o_S           : out std_logic_vector;
-      constant dataWidth   : integer
+      variable i_A         : in  std_logic;
+      variable i_B         : in  std_logic_vector;
+      variable o_S         : out std_logic_vector
    ) is
    begin
-      -- general case
-      for i in 0 to dataWidth-1 loop
+      for i in 0 to i_B'high loop
          p_bit_bit_multiplier(i_A, i_B(i), o_S(i));
       end loop;
-      -- IM DUMB
-      -- -- extrem case with all 1 and multiplication by 2
-      -- if (i_A and (i_B = (others => '1'))) then
-      --    o_S(o_S'high-1 downto o_S'low)   <= (others => '0');
-      --    o_S(o_S'high)                    <= '1';
-      -- end if;
    end procedure p_bit_word_multiplier;
 
-
-   -- multiplier
-   -- Process Description : Multiplier for generic signals and data width
-   -- Details : procedure should have a delay of g_dataWidth clock cycle if clocked
-   -- and can handle one bit augmentation at the end => o_S must be twice the size of input
+   -- Unsigned multiplier procedure
    procedure p_uns_multiplier(
-      signal i_A           : in std_logic_vector;
-      signal i_B           : in std_logic_vector;
-      signal o_S           : out std_logic_vector;
-      constant dataWidth   : integer
+      variable i_A         : in  std_logic_vector;
+      variable i_B         : in  std_logic_vector;
+      variable o_S         : out std_logic_vector;
+      constant dataWidth   : in  integer
    ) is
-      variable s_C   : t_bit_array;
-      variable s_P   : t_vec_array;
-      variable s_acc : t_vec_array;
+      variable partial_products : t_vec_array;
+      variable sum_result      : std_logic_vector(2*dataWidth-1 downto 0);
+      variable carry_out       : std_logic;
+      variable temp_sum        : std_logic_vector(2*dataWidth-1 downto 0);
    begin
-      -- 1st stage
-      p_bit_word_multiplier(i_A(0), i_B, s_P(0));
-      p_bit_word_multiplier(i_A(1), i_B, s_P(1));
-      -- bit padding for correctness
-      p_CLA('0' & s_P(0), s_P(1) & '0', c_carry_null, s_acc(0), s_C(0), s_P(0)'length+1);
+      -- Initialize
+      sum_result := (others => '0');
       
-      o_S(0)      <= s_acc(0)(0);
-
-      -- stage 2 to before last
-      for i in 2 to dataWidth-2 loop
-         -- TODO : finish this
-         -- watch for bit shifting when adding
-         p_bit_word_multiplier(i_A(i), i_B, s_P(i));
-         p_CLA(
-            '0' & s_acc(i-2)(s_acc(i-2)'high downto 1),
-            s_P(i) & '0',
-            s_C(i-2),
-            s_acc(i-1),
-            s_C(i-1),
-            s_P(i)'length+1
-         );
-         o_S(i-1) <= s_acc(i-1)(0); 
+      -- Generate partial products and accumulate
+      for i in 0 to dataWidth-1 loop
+         -- Generate partial product for bit i of multiplier
+         for j in 0 to dataWidth-1 loop
+            p_bit_bit_multiplier(i_A(i), i_B(j), partial_products(i)(j));
+         end loop;
+         
+         -- Shift partial product by i positions and add to accumulator
+         temp_sum := (others => '0');
+         temp_sum(i+dataWidth-1 downto i) := partial_products(i)(dataWidth-1 downto 0);
+         
+         -- Add to running sum
+         p_CLA(sum_result, temp_sum, '0', sum_result, carry_out, 2*dataWidth);
       end loop;
-
-      -- last stage
-      p_bit_word_multiplier(i_A(i_A'high), i_B, s_P(dataWidth-1));
-      p_CLA(
-         '0' & s_acc(s_acc'high)(s_acc(s_acc'high)'high downto 1),
-         s_P(s_P'high) & '0',
-         s_C(s_C'high),
-         s_acc(s_acc'high),
-         s_C(s_C'high),
-         s_P'length+1
-      );
-      o_S(2*dataWidth-1 downto dataWidth-1) <= s_C(s_C'high) & s_acc(s_acc'high);
+      
+      o_S := sum_result;
    end procedure p_uns_multiplier;
 
-
+   -- Signed multiplier procedure
    procedure p_sig_multiplier(
-      signal i_A           : in std_logic_vector;
-      signal i_B           : in std_logic_vector;
-      signal o_S           : out std_logic_vector;
-      constant dataWidth   : integer
+      variable i_A         : in  std_logic_vector;
+      variable i_B         : in  std_logic_vector;
+      variable o_S         : out std_logic_vector;
+      constant dataWidth   : in  integer
    ) is
-      variable s_C   : t_bit_array;
-      variable s_P   : t_vec_array;
-      variable s_acc : t_vec_array;
+      variable abs_A, abs_B : std_logic_vector(dataWidth-1 downto 0);
+      variable result       : std_logic_vector(2*dataWidth-1 downto 0);
+      variable sign_result  : std_logic;
    begin
-      -- 1st stage
-      p_bit_word_multiplier(i_A(0), i_B, s_P(0));
-      p_bit_word_multiplier(i_A(1), i_B, s_P(1));
-      -- bit padding for correctness
-      p_CLA('0' & s_P(0), s_P(1) & '0', c_carry_null, s_acc(0), s_C(0), s_P(0)'length+1);
+      -- Determine result sign
+      sign_result := i_A(dataWidth-1) xor i_B(dataWidth-1);
       
-      o_S(0)      <= s_acc(0)(0);
-
-      -- stage 2 to before last
-      for i in 2 to dataWidth-2 loop
-         -- TODO : finish this
-         -- watch for bit shifting when adding
-         p_bit_word_multiplier(i_A(i), i_B, s_P(i));
-         p_CLA(
-            '0' & s_acc(i-2)(s_acc(i-2)'high downto 1),
-            s_P(i) & '0',
-            s_C(i-2),
-            s_acc(i-1),
-            s_C(i-1),
-            s_P(i)'length+1
-         );
-         o_S(i-1) <= s_acc(i-1)(0); 
-      end loop;
-
-      -- last stage
-      s_P(dataWidth-1) := p_one_complement(i_B); 
-      p_CLA(
-         '0' & s_acc(s_acc'high)(s_acc(s_acc'high)'high downto 1),
-         s_P(s_P'high) & '0',
-         s_C(s_C'high),
-         s_acc(s_acc'high),
-         s_C(s_C'high),
-         s_P'length+1
-      );
-      o_S(2*dataWidth-1 downto dataWidth-1) <= s_C(s_C'high) & s_acc(s_acc'high);      
+      -- Get absolute values
+      if i_A(dataWidth-1) = '1' then
+         p_twos_complement(i_A, abs_A);
+      else
+         abs_A := i_A;
+      end if;
+      
+      if i_B(dataWidth-1) = '1' then
+         p_twos_complement(i_B, abs_B);
+      else
+         abs_B := i_B;
+      end if;
+      
+      -- Perform unsigned multiplication
+      p_uns_multiplier(abs_A, abs_B, result, dataWidth);
+      
+      -- Apply sign
+      if sign_result = '1' then
+         p_twos_complement(result, o_S);
+      else
+         o_S := result;
+      end if;
    end procedure p_sig_multiplier;
 
-
-   -- IP multiplier
-   -- Process Description: IP multiplier for generic signals and data width
-   -- Process is synchronous to FPGA's clock
-   -- Additional details: This process should have a delay of g_dataWidth clock cycle if clocked
+   -- Main multiplier process
    P_IP_multiplier : process(clk)
+      variable result_var : std_logic_vector(2*g_dataWidth-1 downto 0);
    begin
       if rising_edge(clk) then
-         
-         -- signed and vectorized
-         if (i_S='1') and (i_V='1') then
-            -- MSB part
-            if (i_A(c_dataWidth-1)='1' and i_B(c_dataWidth-1)='0') then
-               p_sig_multiplier(i_A(c_dataWidth-1 downto c_dataWidth/2), i_B(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
-            end if;
-            
-            if (i_A(c_dataWidth-1)='0' and i_B(c_dataWidth-1)='1') then
-               p_sig_multiplier(i_B(c_dataWidth-1 downto c_dataWidth/2), i_A(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
-            end if;
-
-            if (i_A(c_dataWidth-1) = i_B(c_dataWidth-1)) then 
-               p_uns_multiplier( '0' & i_A(c_dataWidth-2 downto c_dataWidth/2), '0' & i_B(c_dataWidth-2 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
-            end if;
-
-            -- LSB part
-            if (i_A(c_dataWidth/2-1)='1' and i_B(c_dataWidth/2-1)='0') then
-               p_sig_multiplier(i_A(c_dataWidth/2-1 downto 0), i_B(c_dataWidth/2-1 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
-            end if;
-            
-            if (i_A(c_dataWidth/2-1)='0' and i_B(c_dataWidth/2-1)='1') then
-               p_sig_multiplier(i_B(c_dataWidth/2-1 downto 0), i_A(c_dataWidth/2-1 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
-            end if;
-
-            if (i_A(c_dataWidth/2-1) = i_B(c_dataWidth/2-1)) then 
-               p_uns_multiplier( '0' & i_A(c_dataWidth/2-2 downto 0), '0' & i_B(c_dataWidth/2-2 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
-            end if;
-         end if;
-
-         -- unsigned and vectorized
-         if (i_S='0') and (i_V='1') then
-            p_uns_multiplier(i_A(c_dataWidth-1 downto c_dataWidth/2), i_B(c_dataWidth-1 downto c_dataWidth/2), o_Y(c_dataWidth-1 downto c_dataWidth/2), c_dataWidth/2);               
-            p_uns_multiplier(i_A(c_dataWidth/2-1 downto 0), i_B(c_dataWidth/2-1 downto 0), o_Y(c_dataWidth/2-1 downto 0), c_dataWidth/2);               
-         end if;
-
-         -- signed and unvectorized
-         if (i_S='1') and (i_V='0') then
-
-            if (i_A(i_A'high)='1' and i_B(i_B'high)='0') then
-               p_sig_multiplier(i_A, i_B, o_Y, c_dataWidth);               
-            end if;
-            
-            if (i_A(i_A'high)='0' and i_B(i_B'high)='1') then
-               p_sig_multiplier(i_B, i_A, o_Y, c_dataWidth);               
-            end if;
-
-            if (i_A(i_A'high) = i_B(i_B'high)) then 
-               p_uns_multiplier('0' & i_A(i_A'high-1 downto 0), '0' & i_B(i_B'high-1 downto 0), o_Y, c_dataWidth);               
-            end if;
-         end if;
-        
-         -- unsigned and unvectorized
-         if (i_S='0') and (i_V='0') then 
-            p_uns_multiplier(i_A, i_B, o_Y, c_dataWidth);
-         end if;
-         
-         if reset='1' then
+         if reset = '1' then
             o_Y <= (others => '0');
+         else
+            -- Simple implementation - can be extended for vectorization
+            if i_S = '1' then
+               -- Signed multiplication
+               p_sig_multiplier(i_A, i_B, result_var, g_dataWidth);
+            else
+               -- Unsigned multiplication
+               p_uns_multiplier(i_A, i_B, result_var, g_dataWidth);
+            end if;
+            
+            o_Y <= result_var;
          end if;
       end if;
    end process P_IP_multiplier;
 
--------------------------------------------------------------------------------------------------
 end architecture IP_multiplier;
--------------------------------------------------------------------------------------------------
-
-
 
 -------------------------------------------------------------------------------------------------
--- ARCHITECTURE BEHAVIORAL
+-- ARCHITECTURE BEHAVIORAL (Reference)
 -------------------------------------------------------------------------------------------------
--- Behavioral architecture of the array multiplier, can be used as reference during verification --
 architecture behavioral of multiplier is
-
--------------------------------------------------------------------------------------------------
 begin
--------------------------------------------------------------------------------------------------
+   -- Behavioral reference implementation
+   process(i_A, i_B, i_S, i_V)
+   begin
+      if i_S = '0' and i_V = '0' then
+         -- Unsigned, non-vectorized
+         Y_test <= std_logic_vector(resize(unsigned(i_A) * unsigned(i_B), 2*g_dataWidth));
+      elsif i_S = '1' and i_V = '0' then
+         -- Signed, non-vectorized
+         Y_test <= std_logic_vector(resize(signed(i_A) * signed(i_B), 2*g_dataWidth));
+      elsif i_S = '0' and i_V = '1' then
+         -- Unsigned, vectorized (assuming 8-bit example)
+         Y_test <= std_logic_vector(resize(unsigned(i_A(g_dataWidth-1 downto g_dataWidth/2)) * 
+                                          unsigned(i_B(g_dataWidth-1 downto g_dataWidth/2)), g_dataWidth)) &
+                   std_logic_vector(resize(unsigned(i_A(g_dataWidth/2-1 downto 0)) * 
+                                          unsigned(i_B(g_dataWidth/2-1 downto 0)), g_dataWidth));
+      else
+         -- Signed, vectorized
+         Y_test <= std_logic_vector(resize(signed(i_A(g_dataWidth-1 downto g_dataWidth/2)) * 
+                                          signed(i_B(g_dataWidth-1 downto g_dataWidth/2)), g_dataWidth)) &
+                   std_logic_vector(resize(signed(i_A(g_dataWidth/2-1 downto 0)) * 
+                                          signed(i_B(g_dataWidth/2-1 downto 0)), g_dataWidth));
+      end if;
+   end process;
 
--------------------------------------------------------------------------------------------------
--- PROCESS
--------------------------------------------------------------------------------------------------
-
-Y_test <= BIT_VECTOR( unsigned(A) * unsigned(B) )
-        when s ='0' AND v = '0' else
-     BIT_VECTOR( signed(A) * signed(B) )
-        when s ='1' AND v = '0' else
-     BIT_VECTOR( unsigned(A(7 downto 4)) * unsigned(B(7 downto 4)) ) &
-     BIT_VECTOR( unsigned(A(3 downto 0)) * unsigned(B(3 downto 0)) )
-        when s ='0' AND v = '1' else
-     BIT_VECTOR( signed(A(7 downto 4)) * signed(B(7 downto 4)) ) &
-     BIT_VECTOR( signed(A(3 downto 0)) * signed(B(3 downto 0)) );
-
--------------------------------------------------------------------------------------------------
 end architecture behavioral;
--------------------------------------------------------------------------------------------------
-
-
